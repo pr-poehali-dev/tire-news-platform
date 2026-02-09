@@ -1,4 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+interface Video {
+  id: number;
+  title: string;
+  thumbnail_url: string;
+  duration: string;
+  views: string;
+  created_at?: string;
+}
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +16,65 @@ import Icon from '@/components/ui/icon';
 
 const Index = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [showAdminDialog, setShowAdminDialog] = useState(false);
+  const [newVideo, setNewVideo] = useState({ title: '', thumbnail_url: '', duration: '', views: '0' });
+  const [isLoading, setIsLoading] = useState(false);
+
+  const API_URL = 'https://functions.poehali.dev/4f2c193a-09ee-4695-b3c5-c1555908e48f';
+
+  useEffect(() => {
+    fetchVideos();
+  }, []);
+
+  const fetchVideos = async () => {
+    try {
+      const response = await fetch(API_URL);
+      const data = await response.json();
+      setVideos(data.videos || []);
+    } catch (error) {
+      console.error('Error fetching videos:', error);
+    }
+  };
+
+  const addVideo = async () => {
+    if (!newVideo.title || !newVideo.thumbnail_url || !newVideo.duration) {
+      alert('Заполните все обязательные поля');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newVideo),
+      });
+      
+      if (response.ok) {
+        await fetchVideos();
+        setNewVideo({ title: '', thumbnail_url: '', duration: '', views: '0' });
+        setShowAdminDialog(false);
+      }
+    } catch (error) {
+      console.error('Error adding video:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteVideo = async (id: number) => {
+    if (!confirm('Удалить это видео?')) return;
+    
+    try {
+      const response = await fetch(`${API_URL}?id=${id}`, { method: 'DELETE' });
+      if (response.ok) {
+        await fetchVideos();
+      }
+    } catch (error) {
+      console.error('Error deleting video:', error);
+    }
+  };
 
   const categories = [
     { id: 'all', name: 'Все новости' },
@@ -43,22 +111,7 @@ const Index = () => {
     },
   ];
 
-  const videos = [
-    {
-      id: 1,
-      title: 'Тест-драйв новой серии грузовых шин',
-      duration: '12:34',
-      views: '45K',
-      thumbnail: 'https://cdn.poehali.dev/projects/077c5817-251b-4cd6-a38e-ac33b3233fc6/files/e722312f-da8f-4cb7-aed7-eda101c0e54d.jpg',
-    },
-    {
-      id: 2,
-      title: 'Как выбрать шины для спецтехники',
-      duration: '8:15',
-      views: '32K',
-      thumbnail: 'https://cdn.poehali.dev/projects/077c5817-251b-4cd6-a38e-ac33b3233fc6/files/6c17807e-14c6-4203-8b47-9a5e89c7e899.jpg',
-    },
-  ];
+
 
   const tireComparison = [
     {
@@ -115,9 +168,15 @@ const Index = () => {
               <a href="#about" className="text-sm font-medium hover:text-accent transition-colors">О компании</a>
               <a href="#contacts" className="text-sm font-medium hover:text-accent transition-colors">Контакты</a>
             </nav>
-            <Button className="hidden md:flex">
-              Подписаться
-            </Button>
+            <div className="hidden md:flex gap-2">
+              <Button onClick={() => setShowAdminDialog(true)} variant="outline" size="sm">
+                <Icon name="Settings" size={16} className="mr-2" />
+                Админ
+              </Button>
+              <Button>
+                Подписаться
+              </Button>
+            </div>
             <Button variant="ghost" size="icon" className="md:hidden">
               <Icon name="Menu" size={24} />
             </Button>
@@ -269,11 +328,11 @@ const Index = () => {
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
-            {videos.map((video) => (
+            {videos.map((video: Video) => (
               <Card key={video.id} className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group">
                 <div className="relative aspect-video overflow-hidden bg-black">
                   <img 
-                    src={video.thumbnail} 
+                    src={video.thumbnail_url} 
                     alt={video.title}
                     className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity"
                   />
@@ -290,9 +349,21 @@ const Index = () => {
                   <CardTitle className="text-lg group-hover:text-accent transition-colors">
                     {video.title}
                   </CardTitle>
-                  <CardDescription className="flex items-center gap-2">
-                    <Icon name="Eye" size={14} />
-                    {video.views} просмотров
+                  <CardDescription className="flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Icon name="Eye" size={14} />
+                      {video.views} просмотров
+                    </span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteVideo(video.id);
+                      }}
+                    >
+                      <Icon name="Trash2" size={14} className="text-destructive" />
+                    </Button>
                   </CardDescription>
                 </CardHeader>
               </Card>
@@ -370,6 +441,75 @@ const Index = () => {
           </div>
         </div>
       </footer>
+
+      {showAdminDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md animate-scale-in">
+            <CardHeader>
+              <CardTitle>Добавить видео</CardTitle>
+              <CardDescription>Заполните информацию о новом видео</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Название *</label>
+                <input
+                  type="text"
+                  placeholder="Тест-драйв новых шин"
+                  value={newVideo.title}
+                  onChange={(e) => setNewVideo({ ...newVideo, title: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">URL миниатюры *</label>
+                <input
+                  type="text"
+                  placeholder="https://example.com/image.jpg"
+                  value={newVideo.thumbnail_url}
+                  onChange={(e) => setNewVideo({ ...newVideo, thumbnail_url: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Длительность *</label>
+                <input
+                  type="text"
+                  placeholder="10:30"
+                  value={newVideo.duration}
+                  onChange={(e) => setNewVideo({ ...newVideo, duration: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Просмотры</label>
+                <input
+                  type="text"
+                  placeholder="1.2K"
+                  value={newVideo.views}
+                  onChange={(e) => setNewVideo({ ...newVideo, views: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md"
+                />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button 
+                  onClick={addVideo} 
+                  disabled={isLoading}
+                  className="flex-1"
+                >
+                  {isLoading ? 'Добавление...' : 'Добавить'}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowAdminDialog(false)}
+                  className="flex-1"
+                >
+                  Отмена
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,0 +1,22 @@
+{
+  "tests": [
+    {
+      "name": "Get all videos",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Create new video",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "title": "Test Video",
+        "thumbnail_url": "https://example.com/thumb.jpg",
+        "duration": "10:00",
+        "views": "100"
+      },
+      "expectedStatus": 201
+    }
+  ]
+}

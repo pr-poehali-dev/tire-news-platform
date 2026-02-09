@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS videos (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    thumbnail_url TEXT NOT NULL,
+    duration VARCHAR(10) NOT NULL,
+    views VARCHAR(20) DEFAULT '0',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
