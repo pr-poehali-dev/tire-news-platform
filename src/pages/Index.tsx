@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import WheelRimSelector from '@/components/WheelRimSelector';
+
+const RIMS_API = 'https://functions.poehali.dev/f4f852f7-e6d5-4e79-9132-b96fddbf828b';
 
 interface Video {
   id: number;
@@ -20,8 +23,45 @@ const Index = () => {
   const [showAdminDialog, setShowAdminDialog] = useState(false);
   const [newVideo, setNewVideo] = useState({ title: '', thumbnail_url: '', duration: '', views: '0' });
   const [isLoading, setIsLoading] = useState(false);
+  const [adminTab, setAdminTab] = useState<'video' | 'rims'>('video');
+  const [rimsUploadStatus, setRimsUploadStatus] = useState<string>('');
+  const [rimsUploading, setRimsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const API_URL = 'https://functions.poehali.dev/4f2c193a-09ee-4695-b3c5-c1555908e48f';
+
+  const uploadRimsExcel = async (file: File) => {
+    setRimsUploading(true);
+    setRimsUploadStatus('');
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64 = (e.target?.result as string).split(',')[1];
+      try {
+        const res = await fetch(RIMS_API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'upload_excel', file: base64 }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setRimsUploadStatus(`Успешно загружено ${data.inserted} позиций`);
+        } else {
+          setRimsUploadStatus(`Ошибка: ${data.error}`);
+        }
+      } catch {
+        setRimsUploadStatus('Ошибка при загрузке файла');
+      } finally {
+        setRimsUploading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearRimsCatalog = async () => {
+    if (!confirm('Очистить весь каталог дисков?')) return;
+    await fetch(`${RIMS_API}?clear_all=true`, { method: 'DELETE' });
+    setRimsUploadStatus('Каталог очищен');
+  };
 
   useEffect(() => {
     fetchVideos();
@@ -164,6 +204,7 @@ const Index = () => {
               <a href="#articles" className="text-sm font-medium hover:text-accent transition-colors">Статьи</a>
               <a href="#videos" className="text-sm font-medium hover:text-accent transition-colors">Видео</a>
               <a href="#comparison" className="text-sm font-medium hover:text-accent transition-colors">Сравнение</a>
+              <a href="#rim-selector" className="text-sm font-medium hover:text-accent transition-colors">Диски</a>
               <a href="#catalog" className="text-sm font-medium hover:text-accent transition-colors">Каталог</a>
               <a href="#about" className="text-sm font-medium hover:text-accent transition-colors">О компании</a>
               <a href="#contacts" className="text-sm font-medium hover:text-accent transition-colors">Контакты</a>
@@ -372,6 +413,8 @@ const Index = () => {
         </div>
       </section>
 
+      <WheelRimSelector />
+
       <section className="py-16 bg-primary text-primary-foreground">
         <div className="container mx-auto px-4 text-center">
           <Icon name="Mail" size={48} className="mx-auto mb-6 text-accent" />
@@ -444,68 +487,111 @@ const Index = () => {
 
       {showAdminDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md animate-scale-in">
+          <Card className="w-full max-w-lg animate-scale-in">
             <CardHeader>
-              <CardTitle>Добавить видео</CardTitle>
-              <CardDescription>Заполните информацию о новом видео</CardDescription>
+              <div className="flex items-center justify-between">
+                <CardTitle>Панель администратора</CardTitle>
+                <Button variant="ghost" size="icon" onClick={() => setShowAdminDialog(false)}>
+                  <Icon name="X" size={18} />
+                </Button>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  size="sm"
+                  variant={adminTab === 'video' ? 'default' : 'outline'}
+                  onClick={() => setAdminTab('video')}
+                >
+                  Видео
+                </Button>
+                <Button
+                  size="sm"
+                  variant={adminTab === 'rims' ? 'default' : 'outline'}
+                  onClick={() => setAdminTab('rims')}
+                >
+                  <Icon name="CircleDot" size={14} className="mr-2" />
+                  Диски / Excel
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Название *</label>
-                <input
-                  type="text"
-                  placeholder="Тест-драйв новых шин"
-                  value={newVideo.title}
-                  onChange={(e) => setNewVideo({ ...newVideo, title: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">URL миниатюры *</label>
-                <input
-                  type="text"
-                  placeholder="https://example.com/image.jpg"
-                  value={newVideo.thumbnail_url}
-                  onChange={(e) => setNewVideo({ ...newVideo, thumbnail_url: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Длительность *</label>
-                <input
-                  type="text"
-                  placeholder="10:30"
-                  value={newVideo.duration}
-                  onChange={(e) => setNewVideo({ ...newVideo, duration: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Просмотры</label>
-                <input
-                  type="text"
-                  placeholder="1.2K"
-                  value={newVideo.views}
-                  onChange={(e) => setNewVideo({ ...newVideo, views: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
-                />
-              </div>
-              <div className="flex gap-3 pt-4">
-                <Button 
-                  onClick={addVideo} 
-                  disabled={isLoading}
-                  className="flex-1"
-                >
-                  {isLoading ? 'Добавление...' : 'Добавить'}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowAdminDialog(false)}
-                  className="flex-1"
-                >
-                  Отмена
-                </Button>
-              </div>
+              {adminTab === 'video' && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Название *</label>
+                    <input type="text" placeholder="Тест-драйв новых шин" value={newVideo.title}
+                      onChange={(e) => setNewVideo({ ...newVideo, title: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-md" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">URL миниатюры *</label>
+                    <input type="text" placeholder="https://example.com/image.jpg" value={newVideo.thumbnail_url}
+                      onChange={(e) => setNewVideo({ ...newVideo, thumbnail_url: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-md" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Длительность *</label>
+                    <input type="text" placeholder="10:30" value={newVideo.duration}
+                      onChange={(e) => setNewVideo({ ...newVideo, duration: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-md" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Просмотры</label>
+                    <input type="text" placeholder="1.2K" value={newVideo.views}
+                      onChange={(e) => setNewVideo({ ...newVideo, views: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-md" />
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <Button onClick={addVideo} disabled={isLoading} className="flex-1">
+                      {isLoading ? 'Добавление...' : 'Добавить'}
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {adminTab === 'rims' && (
+                <div className="space-y-5">
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                    <Icon name="FileSpreadsheet" size={40} className="text-muted-foreground mx-auto mb-3" />
+                    <p className="font-medium mb-1">Загрузить базу дисков из Excel</p>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Колонки: Бренд, Модель, Диаметр, Ширина, PCD, ET, DIA, Цвет, Материал, Цена, Наличие, Фото
+                    </p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) uploadRimsExcel(file);
+                      }}
+                    />
+                    <Button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={rimsUploading}
+                    >
+                      {rimsUploading ? (
+                        <><Icon name="Loader" size={16} className="mr-2 animate-spin" />Загрузка...</>
+                      ) : (
+                        <><Icon name="Upload" size={16} className="mr-2" />Выбрать файл</>
+                      )}
+                    </Button>
+                  </div>
+
+                  {rimsUploadStatus && (
+                    <div className={`text-sm px-4 py-3 rounded-md ${rimsUploadStatus.startsWith('Ошибка') ? 'bg-destructive/10 text-destructive' : 'bg-green-50 text-green-700'}`}>
+                      {rimsUploadStatus}
+                    </div>
+                  )}
+
+                  <div className="border-t pt-4">
+                    <Button variant="outline" size="sm" className="text-destructive border-destructive hover:bg-destructive hover:text-white" onClick={clearRimsCatalog}>
+                      <Icon name="Trash2" size={14} className="mr-2" />
+                      Очистить весь каталог
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

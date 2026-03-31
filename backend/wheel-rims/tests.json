@@ -1,0 +1,20 @@
+{
+  "tests": [
+    {
+      "name": "Get rims list",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {"rims": [], "total": 0},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get filters",
+      "method": "GET",
+      "path": "/?action=filters",
+      "expectedStatus": 200,
+      "expectedBody": {"brands": [], "diameters": [], "pcds": [], "widths": []},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
